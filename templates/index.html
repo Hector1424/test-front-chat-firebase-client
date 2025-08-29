@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Chat de Prueba</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+/* --- Estilos Globales y de Layout --- */
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+#app-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+}
+
+/* --- Estilos de Login (sin cambios mayores) --- */
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+#login-container {
+    width: 380px; margin: auto; padding: 40px; background-color: white;
+    border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    text-align: center; animation: fadeIn 0.5s ease-in-out;
+}
+#login-container h2 { margin-top: 0; margin-bottom: 30px; color: #333; font-size: 2em; font-weight: 600; }
+#login-container input {
+    width: 100%; padding: 15px; margin-bottom: 20px; box-sizing: border-box;
+    border-radius: 8px; border: 1px solid #ccc; font-size: 1em; transition: all 0.3s ease;
+}
+#login-container input:focus {
+    outline: none; border-color: #764ba2; box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.2);
+}
+#login-container button {
+    width: 100%; padding: 15px; margin-top: 10px; box-sizing: border-box;
+    border-radius: 8px; background-color: #764ba2; color: white; border: none;
+    cursor: pointer; font-size: 1.1em; font-weight: bold; transition: background-color 0.3s ease, transform 0.1s ease;
+}
+#login-container button:hover { background-color: #623c85; }
+#login-container button:active { transform: scale(0.98); }
+
+/* --- ESTILOS DEL CHAT (MEJORADOS) --- */
+#chat-container {
+    display: none; /* Se activa con JS */
+    flex-grow: 1;
+    display: flex;
+    height: 100%;
+    background-color: #f0f2f5;
+}
+
+/* --- Panel Izquierdo (Contactos) --- */
+#left-panel {
+    width: 30%;
+    max-width: 350px;
+    border-right: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+}
+#left-panel-header { padding: 15px; border-bottom: 1px solid #ddd; }
+#left-panel-header h3 { margin: 0; font-size: 1.2em; }
+#contacts-list { overflow-y: auto; flex-grow: 1; }
+
+/* --- NUEVOS ESTILOS PARA AVATARES Y LISTA DE CONTACTOS --- */
+.contact-item {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 1.1em;
+    color: #333;
+    text-decoration: none;
+}
+.contact-item:hover { background-color: #f5f5f5; }
+.contact-item.active { background-color: #e0e0e0; font-weight: bold; }
+
+.contact-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #e0e0e0;
+    color: white;
+    font-size: 1.2em;
+    font-weight: bold;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 15px;
+    text-transform: uppercase;
+}
+
+/* --- Panel Derecho (Chat) --- */
+#right-panel {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+#placeholder-right-panel {
+    flex-grow: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; color: #65676b; text-align: center;
+}
+
+#chat-window {
+    display: none;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#chat-header {
+    padding: 15px; border-bottom: 1px solid #ddd; background-color: #f5f5f5;
+    font-weight: bold; font-size: 1.1em; display: flex; align-items: center;
+}
+
+#back-to-contacts {
+    display: none;
+    border: none; background: transparent; font-size: 24px;
+    margin-right: 15px; cursor: pointer; padding: 0 10px;
+}
+
+#messages-container {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.message {
+    max-width: 70%; padding: 10px 15px; border-radius: 18px;
+    margin-bottom: 10px; line-height: 1.4; word-wrap: break-word;
+}
+.message.sent { background-color: #0084ff; color: white; align-self: flex-end; }
+.message.received { background-color: #e4e6eb; color: #050505; align-self: flex-start; }
+
+#message-input-container {
+    display: flex; padding: 10px; border-top: 1px solid #ddd; background-color: white;
+}
+#message-input {
+    flex-grow: 1; border: 1px solid #ccc; border-radius: 18px;
+    padding: 10px 15px; font-size: 1em;
+}
+#message-input:focus { outline: none; }
+#message-input-container button {
+    margin-left: 10px; border: none; background-color: #0084ff; color: white;
+    border-radius: 50%; width: 40px; height: 40px; cursor: pointer;
+    font-size: 18px; flex-shrink: 0;
+}
+
+/* --- RESPONSIVIDAD PARA MÓVILES --- */
+@media (max-width: 768px) {
+    #left-panel {
+        width: 100%;
+        max-width: 100%;
+        border-right: none;
+    }
+
+    #right-panel {
+        display: none;
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        background-color: white;
+    }
+
+    #back-to-contacts {
+        display: block;
+    }
+
+    #chat-container.chat-active-mobile #left-panel {
+        display: none;
+    }
+
+    #chat-container.chat-active-mobile #right-panel {
+        display: flex;
+    }
+}
+</style>
+</head>
+<body>
+
+<div id="app-container">
+  <div id="login-container">
+    <h2>Iniciar Sesión</h2>
+    <input type="text" id="username-input" placeholder="Nombre de usuario">
+    <input type="password" id="password-input" placeholder="Contraseña">
+    <button onclick="login()">Entrar</button>
+  </div>
+  
+  <div id="chat-container">
+    <div id="left-panel">
+      <div id="left-panel-header">
+        <h3 id="current-user-name"></h3>
+      </div>
+      <div id="contacts-list"></div>
+    </div>
+    <div id="right-panel">
+      <div id="placeholder-right-panel">
+        <h2>Tu mensajero personal</h2>
+        <p>Selecciona un contacto para empezar a chatear.</p>
+      </div>
+      <div id="chat-window">
+        <div id="chat-header">
+            <button id="back-to-contacts">←</button>
+            <span id="chat-partner-name"></span>
+        </div>
+        <div id="messages-container"></div>
+        <div id="message-input-container">
+          <input type="text" id="message-input" placeholder="Escribe un mensaje..." onkeydown="if(event.key === 'Enter') sendMessage()">
+          <button onclick="sendMessage()">➤</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = "{api_base}";
+const PROJECT_ID = "{project_id}";
+const API_KEY = "{api_key}";
+const USERS = {users_json};
+
+let loggedInUser = null;
+let projectChats = [];
+let activeChat = null;
+let messagePollingInterval = null;
+
+const loginContainer = document.getElementById('login-container');
+const chatContainer = document.getElementById('chat-container');
+const leftPanel = document.getElementById('left-panel');
+const rightPanel = document.getElementById('right-panel');
+const usernameInput = document.getElementById('username-input');
+const passwordInput = document.getElementById('password-input');
+const contactsList = document.getElementById('contacts-list');
+const chatWindow = document.getElementById('chat-window');
+const placeholderRightPanel = document.getElementById('placeholder-right-panel');
+const chatPartnerName = document.getElementById('chat-partner-name');
+const messagesContainer = document.getElementById('messages-container');
+const messageInput = document.getElementById('message-input');
+const currentUserNameEl = document.getElementById('current-user-name');
+const backButton = document.getElementById('back-to-contacts');
+
+function init() {
+  chatContainer.style.display = 'none';
+  loginContainer.style.display = 'block'; 
+  usernameInput.focus();
+  backButton.addEventListener('click', () => {
+      chatContainer.classList.remove('chat-active-mobile');
+      if (messagePollingInterval) clearInterval(messagePollingInterval);
+      activeChat = null;
+      document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
+  });
+}
+
+async function login() {
+  const name = usernameInput.value.trim();
+  const password = passwordInput.value;
+  if (!name || !password) {
+    alert("Por favor, introduce nombre de usuario y contraseña.");
+    return;
+  }
+  try {
+    const response = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, password })
+    });
+    if (!response.ok) throw new Error('Credenciales incorrectas');
+    loggedInUser = await response.json();
+    loginContainer.style.display = 'none';
+    chatContainer.style.display = 'flex';
+    currentUserNameEl.textContent = `Hola, ${loggedInUser.name}`;
+    await loadProjectChats();
+    populateContacts();
+  } catch (error) {
+    console.error("Error de login:", error);
+    alert("Login fallido. Revisa tu usuario y contraseña.");
+  }
+}
+
+function stringToColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = '#';
+  for (let i = 0; i < 3; i++) {
+    const value = (hash >> (i * 8)) & 0xFF;
+    color += ('00' + value.toString(16)).substr(-2);
+  }
+  return color;
+}
+
+function populateContacts() {
+  contactsList.innerHTML = '';
+  const otherUsers = USERS.filter(u => u.uuid !== loggedInUser.uuid);
+  otherUsers.forEach(user => {
+    const contactDiv = document.createElement('div');
+    contactDiv.className = 'contact-item';
+
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'contact-avatar';
+    avatarDiv.style.backgroundColor = stringToColor(user.name);
+    avatarDiv.textContent = user.name.charAt(0);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = user.name;
+    
+    contactDiv.appendChild(avatarDiv);
+    contactDiv.appendChild(nameSpan);
+
+    contactDiv.dataset.userId = user.uuid;
+    contactDiv.onclick = () => openChatWithUser(user);
+    contactsList.appendChild(contactDiv);
+  });
+}
+
+async function loadProjectChats() {
+  try {
+    const response = await fetch(`${API_BASE}/chats`, {
+      headers: { 'X-Project-Id': PROJECT_ID, 'X-Api-Key': API_KEY }
+    });
+    if (!response.ok) throw new Error('Fallo al cargar los chats');
+    projectChats = await response.json();
+  } catch (error) {
+    console.error("Error cargando los chats del proyecto:", error);
+  }
+}
+
+async function openChatWithUser(contactUser) {
+  if (messagePollingInterval) clearInterval(messagePollingInterval);
+
+  document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.contact-item[data-user-id='${contactUser.uuid}']`)?.classList.add('active');
+  chatContainer.classList.add('chat-active-mobile');
+
+  let chat = projectChats.find(c =>
+    c.type === 'direct' && c.users.length === 2 &&
+    c.users.includes(loggedInUser.uuid) && c.users.includes(contactUser.uuid)
+  );
+
+  if (!chat) {
+    try {
+      const response = await fetch(`${API_BASE}/chats/direct`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Project-Id': PROJECT_ID, 'X-Api-Key': API_KEY
+        },
+        body: JSON.stringify({ users: [loggedInUser.uuid, contactUser.uuid] })
+      });
+      if (!response.ok) throw new Error('Fallo al crear el chat remoto');
+      chat = await response.json();
+      projectChats.push(chat);
+    } catch (error) {
+      console.error("Error creando el chat remoto:", error);
+      alert("No se pudo crear un nuevo chat remoto.");
+      return;
+    }
+  }
+
+  activeChat = chat;
+  placeholderRightPanel.style.display = 'none';
+  chatWindow.style.display = 'flex';
+  chatPartnerName.textContent = `Chat con ${contactUser.name}`;
+  messageInput.focus();
+
+  await loadMessages();
+  messagePollingInterval = setInterval(loadMessages, 3000);
+}
+
+async function loadMessages() {
+  if (!activeChat) return;
+  try {
+    const response = await fetch(`${API_BASE}/chats/${activeChat.id}/messages`, {
+      headers: { 'X-Project-Id': PROJECT_ID, 'X-Api-Key': API_KEY }
+    });
+    if (!response.ok) throw new Error('Fallo al cargar los mensajes');
+    const messages = await response.json();
+    renderMessages(messages);
+  } catch (error) {
+    console.error(`Error cargando mensajes para el chat ${activeChat.id}:`, error);
+  }
+}
+
+function renderMessages(messages) {
+  const shouldScroll = messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 30;
+  
+  messagesContainer.innerHTML = '';
+  messages.forEach(msg => {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message ' + (msg.sender_id === loggedInUser.uuid ? 'sent' : 'received');
+
+    const messageText = document.createElement('div');
+    messageText.textContent = msg.text;
+
+    const messageTimestamp = document.createElement('span');
+    messageTimestamp.textContent = new Date(msg.timestamp).toLocaleString();
+    messageTimestamp.style.cssText = `font-size: 0.7em; display: block; color: ${msg.sender_id === loggedInUser.uuid ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)'};`;
+
+    messageDiv.appendChild(messageText);
+    messageDiv.appendChild(messageTimestamp);
+    messagesContainer.appendChild(messageDiv);
+  });
+
+  if (shouldScroll) {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+}
+
+async function sendMessage() {
+  const text = messageInput.value.trim();
+  if (!text || !activeChat) return;
+
+  try {
+    await fetch(`${API_BASE}/chats/${activeChat.id}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Project-Id': PROJECT_ID, 'X-Api-Key': API_KEY
+      },
+      body: JSON.stringify({ sender_id: loggedInUser.uuid, text })
+    });
+    messageInput.value = '';
+    messageInput.focus();
+    await loadMessages();
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  } catch (error) {
+    console.error("Error enviando el mensaje:", error);
+    alert("No se pudo enviar el mensaje.");
+  }
+}
+
+window.onload = init;
+</script>
+
+</body>
+</html>
