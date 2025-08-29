@@ -47,5 +47,11 @@
       "MTrXhTxSeXnNmnLltjTc",
       "M2hQfsWiGSoWSYwjp2kE"
     ]
+  },
+  "b6f88190-6c92-491c-b63e-329b3524b104": {
+    "uuid": "b6f88190-6c92-491c-b63e-329b3524b104",
+    "name": "hector",
+    "password": "1234",
+    "chat_ids": []
   }
 }
