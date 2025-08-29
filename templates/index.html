@@ -133,6 +133,13 @@ body {
 .kebab-menu:hover {
     background-color: rgba(255, 255, 255, 0.15);
 }
+/* Estilo específico para el menú en el header del chat (fondo claro) */
+#chat-header .kebab-menu:hover {
+    background-color: #e4e6eb;
+}
+#chat-header .kebab-menu svg {
+    fill: #65676b; /* Un color oscuro para que contraste */
+}
 .kebab-menu svg {
     width: 24px;
     height: 24px;
@@ -220,7 +227,14 @@ body {
 
 #placeholder-right-panel {
     flex-grow: 1; display: flex; flex-direction: column; align-items: center;
-    justify-content: center; color: #65676b; text-align: center;
+    justify-content: center; color: #65676b; text-align: center; position: relative;
+}
+
+.placeholder-brand {
+    position: absolute;
+    bottom: 20px;
+    font-size: 0.9em;
+    color: #b0b3b8;
 }
 
 #chat-window {
@@ -231,8 +245,14 @@ body {
 }
 
 #chat-header {
-    padding: 15px; border-bottom: 1px solid #ddd; background-color: #f5f5f5;
-    font-weight: bold; font-size: 1.1em; display: flex; align-items: center;
+    padding: 10px 15px; border-bottom: 1px solid #ddd; background-color: #f5f5f5;
+    font-weight: bold; font-size: 1.1em; display: flex; align-items: center; justify-content: space-between;
+}
+
+.chat-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 #back-to-contacts {
@@ -346,11 +366,11 @@ body {
         <div class="user-actions">
           <span id="current-user-name"></span>
           <div class="dropdown">
-            <div class="kebab-menu" onclick="toggleDropdown()">
+            <div class="kebab-menu" onclick="toggleDropdown('logout-dropdown')">
               <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>
             </div>
             <div id="logout-dropdown" class="dropdown-content">
-              <a href="#" id="logout-button">Cerrar Sesión</a>
+              <a href="#" class="logout-link">Cerrar Sesión</a>
             </div>
           </div>
         </div>
@@ -361,11 +381,22 @@ body {
       <div id="placeholder-right-panel">
         <h2>Tu mensajero personal</h2>
         <p>Selecciona un contacto para empezar a chatear.</p>
+        <div class="placeholder-brand">InnovAztlan Chat Service</div>
       </div>
       <div id="chat-window">
         <div id="chat-header">
-            <button id="back-to-contacts">←</button>
-            <span id="chat-partner-name"></span>
+            <div class="chat-header-left">
+                <button id="back-to-contacts">←</button>
+                <span id="chat-partner-name"></span>
+            </div>
+            <div class="dropdown">
+                <div class="kebab-menu" onclick="toggleDropdown('chat-header-dropdown')">
+                  <svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>
+                </div>
+                <div id="chat-header-dropdown" class="dropdown-content">
+                  <a href="#" class="logout-link">Cerrar Sesión</a>
+                </div>
+            </div>
         </div>
         <div id="messages-container"></div>
         <div id="message-input-container">
@@ -408,22 +439,28 @@ const messageInput = document.getElementById('message-input');
 const currentUserNameEl = document.getElementById('current-user-name');
 const backButton = document.getElementById('back-to-contacts');
 const loginButton = document.getElementById('login-button');
-const logoutButton = document.getElementById('logout-button');
-const dropdownMenu = document.getElementById('logout-dropdown');
+const dropdownMenus = document.getElementsByClassName('dropdown-content');
 
 async function initializeApp() {
     // Adjuntar listeners de eventos estáticos
     loginButton.addEventListener('click', login);
-    logoutButton.addEventListener('click', (e) => {
-        e.preventDefault(); // Prevenir comportamiento por defecto del enlace
-        logout();
-    });
+    
+    const logoutLinks = document.getElementsByClassName('logout-link');
+    for (let i = 0; i < logoutLinks.length; i++) {
+        logoutLinks[i].addEventListener('click', (e) => {
+            e.preventDefault();
+            logout();
+        });
+    }
 
     // Cerrar el dropdown si se hace clic fuera de él
     window.onclick = function(event) {
       if (!event.target.closest('.kebab-menu')) {
-        if (dropdownMenu.classList.contains('show')) {
-          dropdownMenu.classList.remove('show');
+        for (let i = 0; i < dropdownMenus.length; i++) {
+          let openDropdown = dropdownMenus[i];
+          if (openDropdown.classList.contains('show')) {
+            openDropdown.classList.remove('show');
+          }
         }
       }
     }
@@ -501,8 +538,16 @@ function logout() {
 }
 
 // Función para mostrar/ocultar el menú desplegable
-function toggleDropdown() {
-    document.getElementById("logout-dropdown").classList.toggle("show");
+function toggleDropdown(dropdownId) {
+    // Cierra todos los demás menús abiertos
+    for (let i = 0; i < dropdownMenus.length; i++) {
+        let openDropdown = dropdownMenus[i];
+        if (openDropdown.id !== dropdownId && openDropdown.classList.contains('show')) {
+            openDropdown.classList.remove('show');
+        }
+    }
+    // Muestra/oculta el menú específico
+    document.getElementById(dropdownId).classList.toggle("show");
 }
 
 function stringToColor(str) {
