@@ -67,7 +67,19 @@ body {
     flex-direction: column;
     background-color: white;
 }
-#left-panel-header { padding: 15px; border-bottom: 1px solid #ddd; }
+#left-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #ddd;
+}
+#logout-button {
+    background: #f44336; color: white; border: none;
+    padding: 8px 12px; border-radius: 5px; cursor: pointer;
+    font-size: 0.9em;
+}
+#logout-button:hover { background: #d32f2f; }
 #left-panel-header h3 { margin: 0; font-size: 1.2em; }
 #contacts-list { overflow-y: auto; flex-grow: 1; }
 
@@ -198,14 +210,15 @@ body {
   <div id="login-container">
     <h2>Iniciar Sesión</h2>
     <input type="text" id="username-input" placeholder="Nombre de usuario">
-    <input type="password" id="password-input" placeholder="Contraseña">
-    <button onclick="login()">Entrar</button>
+    <input type="password" id="password-input" placeholder="Contraseña" onkeydown="if(event.key === 'Enter') login()">
+    <button id="login-button">Entrar</button>
   </div>
   
   <div id="chat-container">
     <div id="left-panel">
       <div id="left-panel-header">
         <h3 id="current-user-name"></h3>
+        <button id="logout-button">Cerrar Sesión</button>
       </div>
       <div id="contacts-list"></div>
     </div>
@@ -254,19 +267,54 @@ const messagesContainer = document.getElementById('messages-container');
 const messageInput = document.getElementById('message-input');
 const currentUserNameEl = document.getElementById('current-user-name');
 const backButton = document.getElementById('back-to-contacts');
+const loginButton = document.getElementById('login-button');
+const logoutButton = document.getElementById('logout-button');
 
-function init() {
-  chatContainer.style.display = 'none';
-  loginContainer.style.display = 'block'; 
-  usernameInput.focus();
-  backButton.addEventListener('click', () => {
-      chatContainer.classList.remove('chat-active-mobile');
-      if (messagePollingInterval) clearInterval(messagePollingInterval);
-      activeChat = null;
-      document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
-  });
+
+async function initializeApp() {
+    // Adjuntar listeners de eventos estáticos
+    loginButton.addEventListener('click', login);
+    logoutButton.addEventListener('click', logout);
+    backButton.addEventListener('click', handleBackToContacts);
+
+    const token = localStorage.getItem('chat_token');
+    if (token) {
+        await validateSessionAndShowChat(token);
+    } else {
+        showLoginView();
+    }
 }
 
+async function validateSessionAndShowChat(token) {
+    try {
+        const response = await fetch('/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Token inválido o sesión expirada');
+        loggedInUser = await response.json();
+        await showChatView();
+    } catch (error) {
+        console.error("Error de sesión:", error);
+        localStorage.removeItem('chat_token');
+        showLoginView();
+    }
+}
+
+function showLoginView() {
+    chatContainer.style.display = 'none';
+    loginContainer.style.display = 'block';
+    usernameInput.focus();
+}
+
+async function showChatView() {
+    loginContainer.style.display = 'none';
+    chatContainer.style.display = 'flex';
+    currentUserNameEl.textContent = `Hola, ${loggedInUser.name}`;
+    await loadProjectChats();
+    populateContacts();
+}
+
+// Función para iniciar sesión
 async function login() {
   const name = usernameInput.value.trim();
   const password = passwordInput.value;
@@ -280,17 +328,21 @@ async function login() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, password })
     });
-    if (!response.ok) throw new Error('Credenciales incorrectas');
-    loggedInUser = await response.json();
-    loginContainer.style.display = 'none';
-    chatContainer.style.display = 'flex';
-    currentUserNameEl.textContent = `Hola, ${loggedInUser.name}`;
-    await loadProjectChats();
-    populateContacts();
+    if (!response.ok) throw new Error('Credenciales incorrectas');    
+    const data = await response.json();
+    localStorage.setItem('chat_token', data.token);
+    loggedInUser = data.user;
+    await showChatView();
   } catch (error) {
     console.error("Error de login:", error);
     alert("Login fallido. Revisa tu usuario y contraseña.");
   }
+}
+
+// Función para cerrar sesión
+function logout() {
+    localStorage.removeItem('chat_token');
+    window.location.reload(); // La forma más simple de resetear el estado de la app
 }
 
 function stringToColor(str) {
@@ -304,6 +356,13 @@ function stringToColor(str) {
     color += ('00' + value.toString(16)).substr(-2);
   }
   return color;
+}
+
+function handleBackToContacts() {
+    chatContainer.classList.remove('chat-active-mobile');
+    if (messagePollingInterval) clearInterval(messagePollingInterval);
+    activeChat = null;
+    document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
 }
 
 function populateContacts() {
@@ -446,7 +505,7 @@ async function sendMessage() {
   }
 }
 
-window.onload = init;
+window.onload = initializeApp;
 </script>
 
 </body>

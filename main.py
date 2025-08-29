@@ -1,22 +1,23 @@
 # main.py — AUTOCONTENIDO (sin Firebase)
 # Usuarios locales + referencias a chat_ids remotos (API Firebase)
 # Sirve /test con tu HTML de prueba desacoplado
-
+ 
 import json
 import uuid
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, status, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
-
-
-
+ 
+ 
+ 
 import os
 from dotenv import load_dotenv
-
+# Instancia para la seguridad de Bearer Token
+security = HTTPBearer()
 # Carga las variables del archivo .env
 load_dotenv()
-
 # =================================
 # Obtiene los valores del .env
 # =================================
@@ -25,7 +26,6 @@ API_KEY = os.getenv("API_KEY")
 API_BASE = os.getenv("API_BASE")  # Si quieres usar una variable para la URL base
 
 app = FastAPI(title="Test Chat UI (autocontenido sin Firebase)")
-
 # =========================
 # "DB" en fichero JSON
 # =========================
@@ -69,9 +69,22 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
 
 
+# Modelo para la petición de login
 class UserLogin(BaseModel):
     name: str
     password: str
+
+
+# Modelo para la respuesta del usuario (sin datos sensibles)
+class User(BaseModel):
+    uuid: str
+    name: str
+    chat_ids: List[str]
+
+# Modelo para la respuesta del login, incluyendo el token
+class LoginResponse(BaseModel):
+    token: str
+    user: User
 
 
 class AddChatRef(BaseModel):
@@ -126,20 +139,41 @@ def delete_user(user_uuid: str):
     return {"ok": True}
 
 
-@app.post("/login", response_class=JSONResponse, tags=["auth"])
-def login_user(payload: UserLogin):
+@app.post("/login", response_model=LoginResponse, tags=["auth"])
+def login(payload: UserLogin):
     """
     Autentica a un usuario por nombre y contraseña (en texto plano).
+    Si es exitoso, devuelve un token y los datos del usuario.
     """
     for u in USERS_STORE.values():
         # Búsqueda insensible a mayúsculas/minúsculas para el nombre
         if u["name"].lower() == payload.name.lower():
             # Comparación de contraseña sensible a mayúsculas/minúsculas
             if u.get("password") == payload.password:
-                return norm_user(u)  # Devuelve el usuario normalizado sin la contraseña
-    
-    raise HTTPException(status_code=401, detail="Nombre de usuario o contraseña incorrectos")
+                # En este sistema simple, el token es el UUID del usuario.
+                return {"token": u["uuid"], "user": norm_user(u)}
 
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Nombre de usuario o contraseña incorrectos",
+    )
+
+
+@app.get("/me", response_model=User, tags=["auth"])
+def get_current_user_from_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Valida un token (Bearer) y devuelve los datos del usuario correspondiente.
+    """
+    token = credentials.credentials
+    # El token es el UUID del usuario.
+    user = USERS_STORE.get(token)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido o expirado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return norm_user(user)
 # =========================
 # Endpoints: Referencias de chats por usuario
 # =========================
