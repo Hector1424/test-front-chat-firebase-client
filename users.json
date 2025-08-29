@@ -1,0 +1,51 @@
+{
+  "ec5df5c0-0245-4cf8-85ee-b0340b8710ff": {
+    "uuid": "ec5df5c0-0245-4cf8-85ee-b0340b8710ff",
+    "name": "Pablo",
+    "password": "1234",
+    "chat_ids": [
+      "MTrXhTxSeXnNmnLltjTc",
+      "a1bNuYpg1gTbBgW89lV3",
+      "mRSrWRxbksgEqEzbe1W9",
+      "p1oUlbZCrJBtiukrKVCg"
+    ]
+  },
+  "eae365c9-3b9c-4848-819e-ac0cae86cab7": {
+    "uuid": "eae365c9-3b9c-4848-819e-ac0cae86cab7",
+    "name": "Andrea",
+    "password": "1234",
+    "chat_ids": [
+      "a1bNuYpg1gTbBgW89lV3",
+      "Utn3dVj1XeSvBnVlAN5p"
+    ]
+  },
+  "c06f4640-1090-4745-9f3e-157fe8339b70": {
+    "uuid": "c06f4640-1090-4745-9f3e-157fe8339b70",
+    "name": "Emilio",
+    "password": "1234",
+    "chat_ids": [
+      "mRSrWRxbksgEqEzbe1W9",
+      "Utn3dVj1XeSvBnVlAN5p",
+      "OCwIdRLSOxAUGAf41PqW",
+      "M2hQfsWiGSoWSYwjp2kE"
+    ]
+  },
+  "5af458b0-c6da-49dd-9e23-f98d456928b6": {
+    "uuid": "5af458b0-c6da-49dd-9e23-f98d456928b6",
+    "name": "Julio",
+    "password": "1234",
+    "chat_ids": [
+      "p1oUlbZCrJBtiukrKVCg",
+      "OCwIdRLSOxAUGAf41PqW"
+    ]
+  },
+  "25fe02a2-0752-466c-a5c6-302215d1786c": {
+    "uuid": "25fe02a2-0752-466c-a5c6-302215d1786c",
+    "name": "Juan",
+    "password": "1234",
+    "chat_ids": [
+      "MTrXhTxSeXnNmnLltjTc",
+      "M2hQfsWiGSoWSYwjp2kE"
+    ]
+  }
+}
