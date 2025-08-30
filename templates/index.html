@@ -345,6 +345,12 @@ body {
     text-decoration: underline;
 }
 </style>
+
+<!--para not push fmc inicio-->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+<!--para not push fmc fin-->
+
 </head>
 <body>
 
@@ -412,8 +418,9 @@ body {
   Copyright © 2025 innovaztlan.com<br>
   Powered by <a href="https://innovaztlan.com" target="_blank" rel="noopener noreferrer">innovaztlan.com</a>
 </footer>
-
+<!-- 
 <script>
+
 const API_BASE = "{api_base}";
 const PROJECT_ID = "{project_id}";
 const API_KEY = "{api_key}";
@@ -711,7 +718,458 @@ async function sendMessage() {
 }
 
 window.onload = initializeApp;
+
+</script> -->
+
+
+
+<script>
+const API_BASE = "{api_base}";
+const PROJECT_ID = "{project_id}";
+const API_KEY = "{api_key}";
+const USERS = {users_json};
+
+let loggedInUser = null;
+let projectChats = [];
+let activeChat = null;
+let messagePollingInterval = null;
+let messaging = null; // Variable for the messaging object
+
+const loginView = document.getElementById('login-view');
+const chatContainer = document.getElementById('chat-container');
+const leftPanel = document.getElementById('left-panel');
+const rightPanel = document.getElementById('right-panel');
+const usernameInput = document.getElementById('username-input');
+const passwordInput = document.getElementById('password-input');
+const contactsList = document.getElementById('contacts-list');
+const chatWindow = document.getElementById('chat-window');
+const placeholderRightPanel = document.getElementById('placeholder-right-panel');
+const chatPartnerName = document.getElementById('chat-partner-name');
+const messagesContainer = document.getElementById('messages-container');
+const messageInput = document.getElementById('message-input');
+const currentUserNameEl = document.getElementById('current-user-name');
+const backButton = document.getElementById('back-to-contacts');
+const loginButton = document.getElementById('login-button');
+const dropdownMenus = document.getElementsByClassName('dropdown-content');
+
+// // START: Firebase Config
+// const firebaseConfig = {
+//     apiKey: API_KEY,
+//     projectId: PROJECT_ID,
+//     appId: "1:896256118832:web:a539d665011e0ac9315df5", // Añade esta línea
+
+// };
+// // END: Firebase Config
+
+
+// START: Firebase Config
+const firebaseConfig = {
+    apiKey: "AIzaSyCMuEJ_TY6OsdId9vWTLJLgyQ5LWr7P3KU",
+    projectId: "chat-48f40",
+    appId: "1:896256118832:web:a539d665011e0ac9315df5",
+    messagingSenderId: "896256118832" // ¡Esta es la línea que falta!
+};
+// END: Firebase Config
+
+
+
+
+
+async function initializeApp() {
+
+
+  // Adjuntar listeners de eventos estáticos
+    loginButton.addEventListener('click', login);
+    
+    const logoutLinks = document.getElementsByClassName('logout-link');
+    for (let i = 0; i < logoutLinks.length; i++) {
+        logoutLinks[i].addEventListener('click', (e) => {
+            e.preventDefault();
+            logout();
+        });
+    }
+
+    // START: Registro del Service Worker para notificaciones push
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+            .then((registration) => {
+                console.log('Service Worker registrado con éxito:', registration);
+                // Si el registro es exitoso, ahora inicializa Firebase
+                if (firebase.apps.length === 0) {
+                    firebase.initializeApp(firebaseConfig);
+                    messaging = firebase.messaging();
+                }
+                
+                // Agrega el onMessage listener aquí para asegurarte de que
+                // el Service Worker ya está en proceso de registro.
+                messaging.onMessage((payload) => {
+                    console.log('Mensaje recibido en primer plano:', payload);
+                    const notificationTitle = payload.notification.title;
+                    const notificationOptions = {
+                        body: payload.notification.body,
+                    };
+                    new Notification(notificationTitle, notificationOptions);
+                    if (activeChat && payload.data && payload.data.chat_id === activeChat.id) {
+                        loadMessages();
+                    }
+                });
+            })
+            .catch((error) => {
+                console.error('Fallo al registrar el Service Worker:', error);
+            });
+    } else {
+        console.warn('Este navegador no soporta Service Workers.');
+    }
+    // END: Registro del Service Worker
+
+    const token = localStorage.getItem('chat_token');
+    if (token) {
+        await validateSessionAndShowChat(token);
+    } else {
+        showLoginView();
+    }
+}
+
+
+
+
+
+async function validateSessionAndShowChat(token) {
+    try {
+        const response = await fetch('/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Token inválido o sesión expirada');
+        loggedInUser = await response.json();
+        await showChatView();
+
+        // Configura las notificaciones SOLO DESPUÉS de registrar el Service Worker
+        setupPushNotifications(loggedInUser.uuid);
+    } catch (error) {
+        console.error("Error de sesión:", error);
+        localStorage.removeItem('chat_token');
+        showLoginView();
+    }
+}
+
+
+function showLoginView() {
+    chatContainer.style.display = 'none';
+    loginView.style.display = 'block';
+    document.getElementById('app-footer').style.display = 'block';
+    usernameInput.focus();
+}
+
+async function showChatView() {
+    loginView.style.display = 'none';
+    chatContainer.style.display = 'flex';
+    document.getElementById('app-footer').style.display = 'none';
+    currentUserNameEl.textContent = `Hola, ${loggedInUser.name}`;
+    await loadProjectChats();
+    populateContacts();
+}
+
+async function login() {
+  const name = usernameInput.value.trim();
+  const password = passwordInput.value;
+  if (!name || !password) {
+    alert("Por favor, introduce nombre de usuario y contraseña.");
+    return;
+  }
+  try {
+    const response = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, password })
+    });
+    if (!response.ok) throw new Error('Credenciales incorrectas'); 
+    const data = await response.json();
+    localStorage.setItem('chat_token', data.token);
+    loggedInUser = data.user;
+    await showChatView();
+
+    // Configure notifications after a successful login
+    setupPushNotifications(loggedInUser.uuid);
+  } catch (error) {
+    console.error("Error de login:", error);
+    alert("Login fallido. Revisa tu usuario y contraseña.");
+  }
+}
+
+function logout() {
+    localStorage.removeItem('chat_token');
+    window.location.reload();
+}
+
+function toggleDropdown(dropdownId) {
+    for (let i = 0; i < dropdownMenus.length; i++) {
+        let openDropdown = dropdownMenus[i];
+        if (openDropdown.id !== dropdownId && openDropdown.classList.contains('show')) {
+            openDropdown.classList.remove('show');
+        }
+    }
+    document.getElementById(dropdownId).classList.toggle("show");
+}
+
+function stringToColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = '#';
+  for (let i = 0; i < 3; i++) {
+    const value = (hash >> (i * 8)) & 0xFF;
+    color += ('00' + value.toString(16)).substr(-2);
+  }
+  return color;
+}
+
+function handleBackToContacts() {
+    chatContainer.classList.remove('chat-active-mobile');
+    if (messagePollingInterval) clearInterval(messagePollingInterval);
+    activeChat = null;
+    document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
+}
+
+function populateContacts() {
+  contactsList.innerHTML = '';
+  const otherUsers = USERS.filter(u => u.uuid !== loggedInUser.uuid);
+  otherUsers.forEach(user => {
+    const contactDiv = document.createElement('div');
+    contactDiv.className = 'contact-item';
+
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'contact-avatar';
+    avatarDiv.style.backgroundColor = stringToColor(user.name);
+    avatarDiv.textContent = user.name.charAt(0);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = user.name;
+    
+    contactDiv.appendChild(avatarDiv);
+    contactDiv.appendChild(nameSpan);
+
+    contactDiv.dataset.userId = user.uuid;
+    contactDiv.onclick = () => openChatWithUser(user);
+    contactsList.appendChild(contactDiv);
+  });
+}
+
+async function loadProjectChats() {
+  try {
+    const response = await fetch(`${API_BASE}/chats`, {
+      headers: { 'X-Project-Id': PROJECT_ID, 'X-Api-Key': API_KEY }
+    });
+    if (!response.ok) throw new Error('Fallo al cargar los chats');
+    projectChats = await response.json();
+  } catch (error) {
+    console.error("Error cargando los chats del proyecto:", error);
+  }
+}
+
+async function openChatWithUser(contactUser) {
+  if (messagePollingInterval) clearInterval(messagePollingInterval);
+
+  document.querySelectorAll('.contact-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.contact-item[data-user-id='${contactUser.uuid}']`)?.classList.add('active');
+  chatContainer.classList.add('chat-active-mobile');
+
+  let chat = projectChats.find(c =>
+    c.type === 'direct' && c.users.length === 2 &&
+    c.users.includes(loggedInUser.uuid) && c.users.includes(contactUser.uuid)
+  );
+
+  if (!chat) {
+    try {
+      const response = await fetch(`${API_BASE}/chats/direct`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Project-Id': PROJECT_ID, 'X-Api-Key': API_KEY
+        },
+        body: JSON.stringify({ users: [loggedInUser.uuid, contactUser.uuid] })
+      });
+      if (!response.ok) throw new Error('Fallo al crear el chat remoto');
+      chat = await response.json();
+      projectChats.push(chat);
+    } catch (error) {
+      console.error("Error creando el chat remoto:", error);
+      alert("No se pudo crear un nuevo chat remoto.");
+      return;
+    }
+  }
+
+  activeChat = chat;
+  placeholderRightPanel.style.display = 'none';
+  chatWindow.style.display = 'flex';
+  chatPartnerName.textContent = `Chat con ${contactUser.name}`;
+  messageInput.focus();
+
+  await loadMessages();
+  messagePollingInterval = setInterval(loadMessages, 3000);
+}
+
+async function loadMessages() {
+  if (!activeChat) return;
+  try {
+    const response = await fetch(`${API_BASE}/chats/${activeChat.id}/messages`, {
+      headers: { 'X-Project-Id': PROJECT_ID, 'X-Api-Key': API_KEY }
+    });
+    if (!response.ok) throw new Error('Fallo al cargar los mensajes');
+    const messages = await response.json();
+    renderMessages(messages);
+  } catch (error) {
+    console.error(`Error cargando mensajes para el chat ${activeChat.id}:`, error);
+  }
+}
+
+function renderMessages(messages) {
+  const shouldScroll = messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 30;
+  
+  messagesContainer.innerHTML = '';
+  messages.forEach(msg => {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message ' + (msg.sender_id === loggedInUser.uuid ? 'sent' : 'received');
+
+    const messageText = document.createElement('div');
+    messageText.textContent = msg.text;
+
+    const messageTimestamp = document.createElement('span');
+    messageTimestamp.textContent = new Date(msg.timestamp).toLocaleString();
+    messageTimestamp.style.cssText = `font-size: 0.7em; display: block; color: ${msg.sender_id === loggedInUser.uuid ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)'};`;
+
+    messageDiv.appendChild(messageText);
+    messageDiv.appendChild(messageTimestamp);
+    messagesContainer.appendChild(messageDiv);
+  });
+
+  if (shouldScroll) {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+}
+
+async function sendMessage() {
+  const text = messageInput.value.trim();
+  if (!text || !activeChat) return;
+
+  try {
+    await fetch(`${API_BASE}/chats/${activeChat.id}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Project-Id': PROJECT_ID, 'X-Api-Key': API_KEY
+      },
+      body: JSON.stringify({ sender_id: loggedInUser.uuid, text })
+    });
+    messageInput.value = '';
+    messageInput.focus();
+    await loadMessages();
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  } catch (error) {
+    console.error("Error enviando el mensaje:", error);
+    alert("No se pudo enviar el mensaje.");
+  }
+}
+
+
+
+
+// // START: New Push Notification Logic
+// async function setupPushNotifications(user_uuid) {
+//     if (!messaging) return;
+
+//     try {
+//         const permission = await Notification.requestPermission();
+//         if (permission === 'granted') {
+//             const currentToken = await messaging.getToken();
+//             if (currentToken) {
+//                 console.log('FCM token:', currentToken);
+//                 await sendTokenToServer(user_uuid, currentToken);
+//             } else {
+//                 console.log('No se pudo obtener el token. ¿Permiso revocado?');
+//             }
+//         } else {
+//             console.log('Permiso de notificación denegado.');
+//         }
+//     } catch (error) {
+//         console.error('Error durante la configuración de notificaciones:', error);
+//     }
+// }
+
+
+
+
+async function setupPushNotifications(user_uuid) {
+    if (!messaging) {
+        console.error('El objeto de mensajería de Firebase no está disponible.');
+        return;
+    }
+
+    try {
+        // 1. Solicitar el permiso al usuario de forma clara.
+        const permission = await Notification.requestPermission();
+
+        if (permission !== 'granted') {
+            console.warn('Permiso de notificación denegado o no concedido.');
+            return;
+        }
+
+        // 2. Obtener el token FCM solo si el permiso fue concedido.
+        const currentToken = await messaging.getToken({
+            vapidKey: 'BCxDJFfgEvdjyLUGKaRjo3jETp_BAFzRbqgmB1ULwwzEntFi_aQCkwohI-fS4SvtY9qOqMfeIm377GrTDm8n1tI' // ¡Importante! Reemplaza con tu clave VAPID
+        });
+
+        if (!currentToken) {
+            console.warn('No se pudo obtener el token FCM.');
+            return;
+        }
+
+        // 3. Registrar el token en el servidor.
+        console.log('Token FCM obtenido:', currentToken);
+        await sendTokenToServer(user_uuid, currentToken);
+        console.log('Token registrado en el servidor exitosamente.');
+
+    } catch (error) {
+        // 4. Manejo de errores centralizado para una mejor depuración.
+        console.error('Error en la configuración de notificaciones push:', error);
+
+        if (error.code === 'messaging/permission-denied') {
+            console.error('El usuario ha bloqueado permanentemente las notificaciones.');
+        } else if (error.code === 'messaging/unsupported-browser') {
+            console.error('El navegador no soporta la API de mensajería de Firebase.');
+        } else {
+            // Error desconocido, se propaga para una mejor depuración.
+            throw error; 
+        }
+    }
+}
+
+
+
+async function sendTokenToServer(user_id, fcm_token) {
+    try {
+        const response = await fetch(`${API_BASE}/save-fcm-token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ user_id, fcm_token })
+        });
+
+        if (!response.ok) {
+            console.error('Error al guardar el token en el servidor.');
+        }
+    } catch (error) {
+        console.error('Error de red al enviar el token:', error);
+    }
+}
+// END: New Push Notification Logic
+
+window.onload = initializeApp;
 </script>
+
+
+
 
 </body>
 </html>

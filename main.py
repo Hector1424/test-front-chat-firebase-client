@@ -7,9 +7,10 @@ import uuid
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Query, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
- 
+from fastapi.staticfiles import StaticFiles
+
  
  
 import os
@@ -25,7 +26,15 @@ PROJECT_ID = os.getenv("PROJECT_ID")
 API_KEY = os.getenv("API_KEY")
 API_BASE = os.getenv("API_BASE")  # Si quieres usar una variable para la URL base
 
+
+
 app = FastAPI(title="Test Chat UI (autocontenido sin Firebase)")
+
+
+# Agrega esta línea para montar la carpeta 'static'
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
 # =========================
 # "DB" en fichero JSON
 # =========================
@@ -204,6 +213,45 @@ def list_all_local_chat_refs():
     return {"chat_ids": sorted(ids)}
 
 
+# # =========================
+# # HTML de prueba
+# # =========================
+# @app.get("/", response_class=HTMLResponse, tags=["frontend"])
+# def serve_test_html():
+#     """
+#     Sirve el HTML de prueba desde un fichero, inyectando:
+#       - API_BASE: URL del main Firebase
+#       - PROJECT_ID / API_KEY globales (para todos los usuarios)
+#       - USERS: los usuarios locales con name/uuid + chat_refs
+#     """
+#     try:
+#         with open("templates/index.html", "r", encoding="utf-8") as f:
+#             template_content = f.read()
+#     except FileNotFoundError:
+#         raise HTTPException(status_code=500, detail="index.html no encontrado.")
+
+#     users_payload = [norm_user(u) for u in USERS_STORE.values()]
+
+#     # Inyecta las variables en el template
+#     # El `or ""` es para evitar errores si una variable de entorno no está definida
+#     html_content = (
+#         template_content.replace("{api_base}", json.dumps(API_BASE or "")[1:-1])
+#         .replace("{project_id}", json.dumps(PROJECT_ID or "")[1:-1])
+#         .replace("{api_key}", json.dumps(API_KEY or "")[1:-1])
+#         .replace("{users_json}", json.dumps(users_payload))
+#     )
+#     return HTMLResponse(content=html_content)
+
+
+
+
+
+
+
+
+
+
+
 # =========================
 # HTML de prueba
 # =========================
@@ -211,15 +259,18 @@ def list_all_local_chat_refs():
 def serve_test_html():
     """
     Sirve el HTML de prueba desde un fichero, inyectando:
-      - API_BASE: URL del main Firebase
-      - PROJECT_ID / API_KEY globales (para todos los usuarios)
-      - USERS: los usuarios locales con name/uuid + chat_refs
+     - API_BASE: URL del main Firebase
+     - PROJECT_ID / API_KEY globales (para todos los usuarios)
+     - USERS: los usuarios locales con name/uuid + chat_refs
     """
     try:
         with open("templates/index.html", "r", encoding="utf-8") as f:
             template_content = f.read()
     except FileNotFoundError:
         raise HTTPException(status_code=500, detail="index.html no encontrado.")
+
+    # Obtén el valor DENTRO de la función
+    FIREBASE_MESSAGING_SENDER_ID = os.getenv("FIREBASE_MESSAGING_SENDER_ID")
 
     users_payload = [norm_user(u) for u in USERS_STORE.values()]
 
@@ -230,5 +281,18 @@ def serve_test_html():
         .replace("{project_id}", json.dumps(PROJECT_ID or "")[1:-1])
         .replace("{api_key}", json.dumps(API_KEY or "")[1:-1])
         .replace("{users_json}", json.dumps(users_payload))
+        # Ahora el valor está disponible para ser inyectado
+        .replace("{messaging_sender_id}", json.dumps(FIREBASE_MESSAGING_SENDER_ID or "")[1:-1])
     )
     return HTMLResponse(content=html_content)
+
+
+
+
+
+@app.get("/firebase-messaging-sw.js", response_class=FileResponse, tags=["frontend"])
+async def serve_firebase_sw():
+    file_path = "firebase-messaging-sw.js"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Service worker not found.")
+    return FileResponse(file_path, media_type="application/javascript")
